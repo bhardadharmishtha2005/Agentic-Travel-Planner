@@ -90,9 +90,9 @@ class AutonomousAgentExecutor:
                     temperature=0.2
                 )
             )
-            return {"output": final_response.text}
+            return final_response.text
             
-        return {"output": response.text if response.text else "No response generated. Please try again."}
+        return response.text if response.text else "No response generated. Please try again."
 
 # Expose execution reference
 travel_agent_brain = AutonomousAgentExecutor()
