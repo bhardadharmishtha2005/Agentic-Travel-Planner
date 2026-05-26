@@ -29,14 +29,16 @@ if st.button("Generate My Custom Itinerary ✨", use_container_width=True):
                 # Constructing the instruction format for the LangChain executor
                 user_query = f"Plan a trip from {source} to {destination}. My hotel budget per night is up to {max_budget}."
                 
-                # Executing the agent run
+                # Executing the agent run - matches the {"input": user_query} mapping in agent.py
                 response = travel_agent_brain.invoke({"input": user_query})
                 
                 # Rendering the final structured response from the LLM
                 st.success("🎉 Your Itinerary is Ready!")
                 st.markdown("### 🗺️ Custom Trip Plan")
+                
+                # Extracting the output safely using the dictionary .get() method
                 st.write(response.get("output", "No itinerary text returned."))
                 
             except Exception as e:
                 st.error(f"An error occurred during agent processing: {str(e)}")
-                st.info("Tip: Please check that your GOOGLE_API_KEY is correctly saved in your .env file and your internet connection is active.")
+                st.info("Tip: Please check that your GOOGLE_API_KEY is correctly saved in your Advanced Secrets Dashboard and your internet connection is active.")

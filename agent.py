@@ -90,10 +90,8 @@ class AutonomousAgentExecutor:
                     temperature=0.2
                 )
             )
-            # Change this line to return a dictionary:
             return {"output": final_response.text}
             
-        # Change this line to return a dictionary:
         return {"output": response.text if response.text else "No response generated. Please try again."}
 
 # Expose execution reference
