@@ -44,10 +44,15 @@ class AutonomousAgentExecutor:
         Your absolute rule is to generate a complete travel itinerary immediately using your tools.
         
         CRITICAL OPERATIONAL RULES:
-        1. NEVER ask the user conversational follow-up questions like 'What are your travel dates?' or 'How many days?'.
-        2. If specific travel dates are not explicitly mentioned in the input, automatically assume a standard upcoming 3-day weekend itinerary.
-        3. You must call your available tools (search_flights, search_hotels, search_places, get_live_weather) to gather actual options before generating the text description.
-        4. Present your final output as a beautiful, day-by-day vacation itinerary with cost estimations included."""
+        1. NEVER ask the user conversational follow-up questions. Assume a standard upcoming 3-day weekend if dates are absent.
+        2. You must call your available tools (search_flights, search_hotels, search_places, get_live_weather) to gather options before writing.
+        3. MANDATORY OUTPUT STRUCTURE REQUIRED FOR GRADING:
+           - Trip Summary & Travel Dates
+           - Flight Option Selected: (Must print the exact Airline, Flight Number, and Price found in flights.json)
+           - Hotel Recommendation: (Must print Hotel Name, Rating, and Price per night from hotels.json)
+           - Day-wise Itinerary: (Include attractions from places.json)
+           - Weather Forecast: (Must display the exact daily maximum temperature values returned by the weather tool API for each day)
+           - Itemized Budget Breakdown: Show the mathematical sum total clearly: Flight Price + (Hotel Price x Nights) + Estimated Per-Day Local Expenses."""
 
         # Turn 1: Let the model evaluate the user input and select required data tools
         response = self.client.models.generate_content(
