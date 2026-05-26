@@ -70,7 +70,7 @@ class AutonomousAgentExecutor:
                 
                 if tool_name in self.tools_map:
                     try:
-                        result = self.tools_map[tool_name].invoke(input=tool_args)
+                        result = self.tools_map[tool_name].invoke(tool_args)
                         tool_outputs.append(f"Tool '{tool_name}' returned data:\n{result}")
                     except Exception as e:
                         tool_outputs.append(f"Tool '{tool_name}' execution failed: {str(e)}")
