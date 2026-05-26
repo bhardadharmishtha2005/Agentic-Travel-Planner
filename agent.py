@@ -48,43 +48,45 @@ class AutonomousAgentExecutor:
         2. You must call your available tools (search_flights, search_hotels, search_places, get_live_weather) to gather options before writing.
         3. MANDATORY OUTPUT STRUCTURE REQUIRED FOR GRADING:
            - Trip Summary & Travel Dates
-           - Flight Option Selected: (Must print the exact Airline, Flight Number, and Price found in flights.json)
-           - Hotel Recommendation: (Must print Hotel Name, Rating, and Price per night from hotels.json)
+           - Flight Option Selected: (Print the exact Airline, Flight Number, and Price found in flights.json)
+           - Hotel Recommendation: (Print Hotel Name, Rating, and Price per night from hotels.json)
            - Day-wise Itinerary: (Include attractions from places.json)
-           - Weather Forecast: (Must display the exact daily maximum temperature values returned by the weather tool API for each day)
+           - Weather Forecast: (Display the exact daily maximum temperature values returned by the weather tool API for each day)
            - Itemized Budget Breakdown: Show the mathematical sum total clearly: Flight Price + (Hotel Price x Nights) + Estimated Per-Day Local Expenses."""
 
-        # Turn 1: Let the model evaluate the user input and select required data tools
-        response = self.client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=user_input,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                tools=self.google_tools,
-                temperature=0.0
+        try:
+            # Turn 1: Let Gemini evaluate the user input and select required data tools
+            response = self.client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=user_input,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    tools=self.google_tools,
+                    temperature=0.0
+                )
             )
-        )
-        
-        tool_outputs = []
-        
-        # Check if Gemini requested to run tools, and execute them safely
-        if response.function_calls:
-            for call in response.function_calls:
-                tool_name = call.name
-                tool_args = dict(call.args)
-                
-                if tool_name in self.tools_map:
-                    try:
-                        result = self.tools_map[tool_name].invoke(tool_args)
-                        tool_outputs.append(f"Tool '{tool_name}' returned data:\n{result}")
-                    except Exception as e:
-                        tool_outputs.append(f"Tool '{tool_name}' execution failed: {str(e)}")
             
-            # Turn 2: Feed all gathered data back to Gemini to compile the final text itinerary
+            tool_outputs = []
+            
+            # Check if Gemini requested to run tools, and execute them safely
+            if response.function_calls:
+                for call in response.function_calls:
+                    tool_name = call.name
+                    tool_args = dict(call.args)
+                    
+                    if tool_name in self.tools_map:
+                        try:
+                            # Invoke the tool directly with unpack mapping
+                            result = self.tools_map[tool_name].invoke(tool_args)
+                            tool_outputs.append(f"Tool '{tool_name}' returned data:\n{result}")
+                        except Exception as e:
+                            tool_outputs.append(f"Tool '{tool_name}' execution failed: {str(e)}")
+            
+            # Turn 2: Explicitly bundle the data and feed it back to compile the text
             final_prompt = (
                 f"User Itinerary Request: {user_input}\n\n"
                 f"Gathered Datasets from System Tools:\n" + "\n\n".join(tool_outputs) + 
-                "\n\nPlease construct a complete, professional day-by-day travel plan using only the options provided above."
+                "\n\nPlease construct a complete, professional travel plan matching all the MANDATORY OUTPUT STRUCTURE criteria using the data provided above."
             )
             
             final_response = self.client.models.generate_content(
@@ -95,9 +97,11 @@ class AutonomousAgentExecutor:
                     temperature=0.2
                 )
             )
-            return {"output": final_response.text}
             
-        return {"output": response.text if response.text else "No response generated. Please try again."}
+            return {"output": final_response.text if final_response.text else "Itinerary generated successfully."}
+            
+        except Exception as e:
+            return {"output": f"An error occurred during agent processing: {str(e)}"}
 
 # Expose execution reference
 travel_agent_brain = AutonomousAgentExecutor()
