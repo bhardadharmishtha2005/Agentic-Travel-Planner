@@ -40,14 +40,19 @@ class AutonomousAgentExecutor:
     def invoke(self, inputs: dict) -> dict:
         user_input = inputs.get("input", "")
         
-        system_instruction = """You are an expert Autonomous AI Travel Planning Assistant.
+        # Dynamically fetch the current real-world date context in Python
+        from datetime import datetime
+        current_date_str = datetime.now().strftime("%B %d, %Y")
+        
+        system_instruction = f"""You are an expert Autonomous AI Travel Planning Assistant.
         Your absolute rule is to generate a complete travel itinerary immediately using your tools.
         
         CRITICAL OPERATIONAL RULES:
-        1. NEVER ask the user conversational follow-up questions. Assume a standard upcoming 3-day weekend if dates are absent.
-        2. You must call your available tools (search_flights, search_hotels, search_places, get_live_weather) to gather options before writing.
-        3. MANDATORY OUTPUT STRUCTURE REQUIRED FOR GRADING:
-           - Trip Summary & Travel Dates
+        1. NEVER ask the user conversational follow-up questions. 
+        2. CURRENT REAL-WORLD DATE CONTEXT: Today is {current_date_str}. If specific travel dates are not explicitly mentioned by the user, automatically assume a standard upcoming 3-day weekend itinerary starting from the next closest Friday relative to today's date ({current_date_str}). Ensure the planned travel year matches 2026.
+        3. You must call your available tools (search_flights, search_hotels, search_places, get_live_weather) to gather options before writing.
+        4. MANDATORY OUTPUT STRUCTURE REQUIRED FOR GRADING:
+           - Trip Summary & Travel Dates (Must look forward into 2026)
            - Flight Option Selected: (Print the exact Airline, Flight Number, and Price found in flights.json)
            - Hotel Recommendation: (Print Hotel Name, Rating, and Price per night from hotels.json)
            - Day-wise Itinerary: (Include attractions from places.json)
@@ -84,9 +89,10 @@ class AutonomousAgentExecutor:
             
             # Turn 2: Explicitly bundle the data and feed it back to compile the text
             final_prompt = (
-                f"User Itinerary Request: {user_input}\n\n"
+                f"User Itinerary Request: {user_input}\n"
+                f"Current Date Baseline: {current_date_str}\n\n"
                 f"Gathered Datasets from System Tools:\n" + "\n\n".join(tool_outputs) + 
-                "\n\nPlease construct a complete, professional travel plan matching all the MANDATORY OUTPUT STRUCTURE criteria using the data provided above."
+                "\n\nPlease construct a complete, professional travel plan matching all the MANDATORY OUTPUT STRUCTURE criteria using the data provided above. Ensure the dates chosen reflect an upcoming real weekend in 2026."
             )
             
             final_response = self.client.models.generate_content(
