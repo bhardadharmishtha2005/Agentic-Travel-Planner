@@ -12,10 +12,14 @@ from tools import search_flights, search_hotels, search_places, get_live_weather
 load_dotenv()
 
 class AutonomousAgentExecutor:
+    """
+    An Agentic AI System built using the Google GenAI SDK that autonomously 
+    orchestrates travel planning by executing a multi-turn tool calling workflow.
+    """
     def __init__(self):
         load_dotenv()
         
-        # Pull key from local environment first; if empty, pull from Streamlit Cloud Secrets dashboard box
+        # Pull API key from local environment or Streamlit Secrets dashboard securely
         api_key = os.getenv("GOOGLE_API_KEY")
         if not api_key and "GOOGLE_API_KEY" in st.secrets:
             api_key = st.secrets["GOOGLE_API_KEY"]
@@ -23,10 +27,10 @@ class AutonomousAgentExecutor:
         if api_key:
             api_key = api_key.strip()
         
-        # Build the client using the clean namespace module reference
+        # Initialize the Google GenAI client reference
         self.client = google_genai_sdk.Client(api_key=api_key)
         
-        # Map tool names directly to their executable Python function wrapper
+        # Map tool keys directly to their executable Python functions
         self.tools_map = {
             "search_flights": search_flights,
             "search_hotels": search_hotels,
@@ -34,45 +38,52 @@ class AutonomousAgentExecutor:
             "get_live_weather": get_live_weather
         }
         
-        # Pass the tool definitions so Google's schema parser processes them natively
+        # List of tool signatures passed to the model for functional routing
         self.google_tools = [search_flights, search_hotels, search_places, get_live_weather]
 
     def invoke(self, inputs: dict) -> dict:
+        """
+        Executes a two-turn ReAct / Tool-Calling reasoning loop to interpret 
+        user travel requests, call tools, and synthesize structured plans.
+        """
         user_input = inputs.get("input", "")
         
         from datetime import datetime
-        import time  # Import time to create a slight delay
+        import time  # Used to build recovery delay loops for server stability
         current_date_str = datetime.now().strftime("%B %d, %Y")
         
+        # High-quality system instructions ensuring strict compliance with operational rules
         system_instruction = f"""You are an expert Autonomous AI Travel Planning Assistant.
         Your absolute rule is to generate a complete travel itinerary immediately using your tools.
         
         CRITICAL OPERATIONAL RULES:
-        1. NEVER ask the user conversational follow-up questions. 
+        1. NEVER ask the user conversational follow-up questions. Always complete the plan in one run.
         2. CURRENT REAL-WORLD DATE CONTEXT: Today is {current_date_str}. If specific travel dates are not explicitly mentioned by the user, automatically assume a standard upcoming 3-day weekend itinerary starting from the next closest Friday relative to today's date ({current_date_str}). Ensure the planned travel year matches 2026.
-        3. You must call your available tools (search_flights, search_hotels, search_places, get_live_weather) to gather options before writing."""
+        3. You must call your available tools (search_flights, search_hotels, search_places, get_live_weather) to gather real-world options before writing the itinerary."""
 
-        # Try running the model up to 3 times if the server is busy
+        # Robust try-except error handling loop with automatic multi-attempt retries
         for attempt in range(3):
             try:
-                # Turn 1: Let Gemini evaluate the user input
+                # TURN 1: Autonomous Intent Analysis & Tool Calling Decision
                 response = self.client.models.generate_content(
                     model='gemini-2.5-flash',
                     contents=user_input,
                     config=types.GenerateContentConfig(
                         system_instruction=system_instruction,
                         tools=self.google_tools,
-                        temperature=0.0
+                        temperature=0.0  # Greedy decoding for high tool accuracy
                     )
                 )
                 
                 tool_outputs = []
+                # Execute called functions programmatically if the model chose to use them
                 if response.function_calls:
                     for call in response.function_calls:
                         tool_name = call.name
                         tool_args = dict(call.args)
                         if tool_name in self.tools_map:
                             try:
+                                # Safe execution check for LangChain-wrapped structures or raw callables
                                 if hasattr(self.tools_map[tool_name], 'invoke'):
                                     result = self.tools_map[tool_name].invoke(tool_args)
                                 else:
@@ -81,7 +92,8 @@ class AutonomousAgentExecutor:
                             except Exception as e:
                                 tool_outputs.append(f"Tool '{tool_name}' execution failed: {str(e)}")
                 
-                # Turn 2: Synthesize final output matching the exact grading guidelines template layout
+
+                # TURN 2: Data Synthesis & Strict Template Formatting Response
                 final_prompt = f"""
                 User Itinerary Request: {user_input}
                 Current Date Baseline: {current_date_str}
@@ -89,32 +101,39 @@ class AutonomousAgentExecutor:
                 Gathered Datasets from System Tools:
                 {" ".join(tool_outputs)}
 
-                Please construct the travel plan using the exact template format below. Do not use creative introductory stories, conversational filler, or intro paragraphs. Follow this layout strictly:
+                Please construct the travel plan using the exact template format below. Make sure all section headers are bold using standard Markdown asterisks (**). Follow this layout strictly:
 
-                Your 3-Day Trip to [Destination City Name] ([Planned Weekend Dates in 2026])
+                ### 🗺️ Custom Trip Plan
 
-                Flight Selected:
-                - [Airline Name] ([Flight Price] INR) – Departs [Source City] at [Departure Time] (Flight Number: [Flight Number])
+                A 3-day weekend trip from [Source City] to [Destination City], India, has been successfully planned for **[Planned Weekend Dates in 2026]**.
 
-                Hotel Booked:
-                - [Hotel Name] ([Price per night] INR/night, [Star Rating]-star)
+                **Flight Option Selected:**
+                - Airline: [Airline Name]
+                - Flight Number: [Flight Number]
+                - Departure Time: [Departure Time]
+                - Price: [Flight Price] INR
 
-                Weather:
-                - Day 1: [Weather status or forecast description from tool data] ([Max Temp]°C)
-                - Day 2: [Weather status or forecast description from tool data] ([Max Temp]°C)
-                - Day 3: [Weather status or forecast description from tool data] ([Max Temp]°C)
+                **Hotel Recommendation:**
+                - Hotel Name: [Hotel Name]
+                - Star Rating: [Star Rating]-star
+                - Price per night: [Price per night] INR
 
-                Itinerary:
-                Day 1: [Sightseeing attractions from places.json for day 1]
-                Day 2: [Sightseeing attractions from places.json for day 2]
-                Day 3: [Sightseeing attractions from places.json for day 3]
+                **Weather Forecast:**
+                - Day 1: [Weather status description] ([Max Temp]°C)
+                - Day 2: [Weather status description] ([Max Temp]°C)
+                - Day 3: [Weather status description] ([Max Temp]°C)
 
-                Estimated Total Budget:
-                - Flight: [Flight Price] INR
-                - Hotel: [Total Hotel Price for the nights] INR
-                - Food & Travel: [Estimated Per-Day Local Expenses total] INR
-                -------------------------------------
-                Total Cost: [Complete calculated total sum] INR
+                **Day-wise Itinerary:**
+                - **Day 1:** [Sightseeing attractions for day 1 separated by commas from places.json]
+                - **Day 2:** [Sightseeing attractions for day 2 separated by commas from places.json]
+                - **Day 3:** [Sightseeing attractions for day 3 separated by commas from places.json]
+
+                **Estimated Total Budget Breakdown:**
+                - Flight Cost: [Flight Price] INR
+                - Accommodation (2 Nights): [Total Hotel Price for 2 nights] INR
+                - Food & Local Travel Allowance: [Estimated Per-Day Local Expenses total] INR
+                
+                **Total Cost:** [Complete calculated total mathematical sum] INR
                 """
                 
                 final_response = self.client.models.generate_content(
@@ -129,11 +148,12 @@ class AutonomousAgentExecutor:
                 return {"output": final_response.text if final_response.text else "Itinerary generated successfully."}
                 
             except Exception as e:
-                # If it's a server error, wait 3 seconds and try the loop again
+                # Catch 503 Overload and 429 Quota limits cleanly, wait 3 seconds, and retry loop
                 if ("503" in str(e) or "429" in str(e)) and attempt < 2:
                     time.sleep(3)
                     continue
+                # Gracefully fall back to an on-screen warning description instead of throwing a blank server crash
                 return {"output": f"The AI server is very busy right now. Please click the button to try again in a moment! (Error details: {str(e)})"}
 
-# Expose execution reference
+# Expose execution reference module instance
 travel_agent_brain = AutonomousAgentExecutor()
