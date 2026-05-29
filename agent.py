@@ -40,74 +40,63 @@ class AutonomousAgentExecutor:
     def invoke(self, inputs: dict) -> dict:
         user_input = inputs.get("input", "")
         
-        # Dynamically fetch the current real-world date context in Python
         from datetime import datetime
+        import time  # Import time to create a slight delay
         current_date_str = datetime.now().strftime("%B %d, %Y")
         
-        system_instruction = f"""You are an expert Autonomous AI Travel Planning Assistant.
-        Your absolute rule is to generate a complete travel itinerary immediately using your tools.
-        
-        CRITICAL OPERATIONAL RULES:
-        1. NEVER ask the user conversational follow-up questions. 
-        2. CURRENT REAL-WORLD DATE CONTEXT: Today is {current_date_str}. If specific travel dates are not explicitly mentioned by the user, automatically assume a standard upcoming 3-day weekend itinerary starting from the next closest Friday relative to today's date ({current_date_str}). Ensure the planned travel year matches 2026.
-        3. You must call your available tools (search_flights, search_hotels, search_places, get_live_weather) to gather options before writing.
-        4. MANDATORY OUTPUT STRUCTURE REQUIRED FOR GRADING:
-           - Trip Summary & Travel Dates (Must look forward into 2026)
-           - Flight Option Selected: (Print the exact Airline, Flight Number, and Price found in flights.json)
-           - Hotel Recommendation: (Print Hotel Name, Rating, and Price per night from hotels.json)
-           - Day-wise Itinerary: (Include attractions from places.json)
-           - Weather Forecast: (Display the exact daily maximum temperature values returned by the weather tool API for each day)
-           - Itemized Budget Breakdown: Show the mathematical sum total clearly: Flight Price + (Hotel Price x Nights) + Estimated Per-Day Local Expenses."""
+        system_instruction = f"""You are an expert Autonomous AI Travel Planning Assistant...""" # Keep your same system instruction here
 
-        try:
-            # Turn 1: Let Gemini evaluate the user input and select required data tools
-            response = self.client.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=user_input,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_instruction,
-                    tools=self.google_tools,
-                    temperature=0.0
+        # Try running the model up to 3 times if the server is busy
+        for attempt in range(3):
+            try:
+                # Turn 1: Let Gemini evaluate the user input
+                response = self.client.models.generate_content(
+                    model='gemini-2.5-flash',
+                    contents=user_input,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_instruction,
+                        tools=self.google_tools,
+                        temperature=0.0
+                    )
                 )
-            )
-            
-            tool_outputs = []
-            
-            # Check if Gemini requested to run tools, and execute them safely
-            if response.function_calls:
-                for call in response.function_calls:
-                    tool_name = call.name
-                    tool_args = dict(call.args)
-                    
-                    if tool_name in self.tools_map:
-                        try:
-                            # Invoke the tool directly with unpack mapping
-                            result = self.tools_map[tool_name].invoke(tool_args)
-                            tool_outputs.append(f"Tool '{tool_name}' returned data:\n{result}")
-                        except Exception as e:
-                            tool_outputs.append(f"Tool '{tool_name}' execution failed: {str(e)}")
-            
-            # Turn 2: Explicitly bundle the data and feed it back to compile the text
-            final_prompt = (
-                f"User Itinerary Request: {user_input}\n"
-                f"Current Date Baseline: {current_date_str}\n\n"
-                f"Gathered Datasets from System Tools:\n" + "\n\n".join(tool_outputs) + 
-                "\n\nPlease construct a complete, professional travel plan matching all the MANDATORY OUTPUT STRUCTURE criteria using the data provided above. Ensure the dates chosen reflect an upcoming real weekend in 2026."
-            )
-            
-            final_response = self.client.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=final_prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_instruction,
-                    temperature=0.2
+                
+                tool_outputs = []
+                if response.function_calls:
+                    for call in response.function_calls:
+                        tool_name = call.name
+                        tool_args = dict(call.args)
+                        if tool_name in self.tools_map:
+                            try:
+                                result = self.tools_map[tool_name].invoke(tool_args)
+                                tool_outputs.append(f"Tool '{tool_name}' returned data:\n{result}")
+                            except Exception as e:
+                                tool_outputs.append(f"Tool '{tool_name}' execution failed: {str(e)}")
+                
+                # Turn 2: Synthesize final output
+                final_prompt = (
+                    f"User Itinerary Request: {user_input}\n"
+                    f"Current Date Baseline: {current_date_str}\n\n"
+                    f"Gathered Datasets from System Tools:\n" + "\n\n".join(tool_outputs) + 
+                    "\n\nPlease construct a complete, professional travel plan..."
                 )
-            )
-            
-            return {"output": final_response.text if final_response.text else "Itinerary generated successfully."}
-            
-        except Exception as e:
-            return {"output": f"An error occurred during agent processing: {str(e)}"}
-
+                
+                final_response = self.client.models.generate_content(
+                    model='gemini-2.5-flash',
+                    contents=final_prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_instruction,
+                        temperature=0.2
+                    )
+                )
+                
+                return {"output": final_response.text if final_response.text else "Itinerary generated successfully."}
+                
+            except Exception as e:
+                # If it's a server error, wait 3 seconds and try the loop again
+                if "503" in str(e) and attempt < 2:
+                    time.sleep(3)
+                    continue
+                # If it still fails after 3 tries, show the error message
+                return {"output": f"The AI server is very busy right now. Please click the button to try again in a moment! (Error details: {str(e)})"}
 # Expose execution reference
 travel_agent_brain = AutonomousAgentExecutor()
