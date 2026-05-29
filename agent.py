@@ -55,9 +55,9 @@ class AutonomousAgentExecutor:
         # Try running the model up to 3 times if the server is busy
         for attempt in range(3):
             try:
-                # Turn 1: Let Gemini evaluate the user input using 1.5-flash to bypass 503 traffic
+                # Turn 1: Let Gemini evaluate the user input
                 response = self.client.models.generate_content(
-                    model='gemini-1.5-flash',
+                    model='gemini-2.5-flash',
                     contents=user_input,
                     config=types.GenerateContentConfig(
                         system_instruction=system_instruction,
@@ -73,7 +73,6 @@ class AutonomousAgentExecutor:
                         tool_args = dict(call.args)
                         if tool_name in self.tools_map:
                             try:
-                                # Look for an internal invoke method if available, otherwise call directly
                                 if hasattr(self.tools_map[tool_name], 'invoke'):
                                     result = self.tools_map[tool_name].invoke(tool_args)
                                 else:
@@ -119,7 +118,7 @@ class AutonomousAgentExecutor:
                 """
                 
                 final_response = self.client.models.generate_content(
-                    model='gemini-1.5-flash',
+                    model='gemini-2.5-flash',
                     contents=final_prompt,
                     config=types.GenerateContentConfig(
                         system_instruction=system_instruction,
@@ -134,7 +133,6 @@ class AutonomousAgentExecutor:
                 if ("503" in str(e) or "429" in str(e)) and attempt < 2:
                     time.sleep(3)
                     continue
-                # If it still fails after 3 tries, show the error message gracefully
                 return {"output": f"The AI server is very busy right now. Please click the button to try again in a moment! (Error details: {str(e)})"}
 
 # Expose execution reference
