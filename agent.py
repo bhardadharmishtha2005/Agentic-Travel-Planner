@@ -64,7 +64,9 @@ class AutonomousAgentExecutor:
         # Robust try-except error handling loop with automatic multi-attempt retries
         for attempt in range(3):
             try:
+                # =====================================================================
                 # TURN 1: Autonomous Intent Analysis & Tool Calling Decision
+                # =====================================================================
                 response = self.client.models.generate_content(
                     model='gemini-2.5-flash',
                     contents=user_input,
@@ -92,8 +94,9 @@ class AutonomousAgentExecutor:
                             except Exception as e:
                                 tool_outputs.append(f"Tool '{tool_name}' execution failed: {str(e)}")
                 
-
+                # =====================================================================
                 # TURN 2: Data Synthesis & Strict Template Formatting Response
+                # =====================================================================
                 final_prompt = f"""
                 User Itinerary Request: {user_input}
                 Current Date Baseline: {current_date_str}
@@ -101,39 +104,32 @@ class AutonomousAgentExecutor:
                 Gathered Datasets from System Tools:
                 {" ".join(tool_outputs)}
 
-                Please construct the travel plan using the exact template format below. Make sure all section headers are bold using standard Markdown asterisks (**). Follow this layout strictly:
+                Please construct the travel plan using the exact syllabus template format below. Do not use creative introductory stories or conversational paragraphs. Follow this layout strictly:
 
-                ### 🗺️ Custom Trip Plan
-
-                A 3-day weekend trip from [Source City] to [Destination City], India, has been successfully planned for **[Planned Weekend Dates in 2026]**.
-
-                **Flight Option Selected:**
-                - Airline: [Airline Name]
-                - Flight Number: [Flight Number]
-                - Departure Time: [Departure Time]
-                - Price: [Flight Price] INR
-
-                **Hotel Recommendation:**
-                - Hotel Name: [Hotel Name]
-                - Star Rating: [Star Rating]-star
-                - Price per night: [Price per night] INR
-
-                **Weather Forecast:**
-                - Day 1: [Weather status description] ([Max Temp]°C)
-                - Day 2: [Weather status description] ([Max Temp]°C)
-                - Day 3: [Weather status description] ([Max Temp]°C)
-
-                **Day-wise Itinerary:**
-                - **Day 1:** [Sightseeing attractions for day 1 separated by commas from places.json]
-                - **Day 2:** [Sightseeing attractions for day 2 separated by commas from places.json]
-                - **Day 3:** [Sightseeing attractions for day 3 separated by commas from places.json]
-
-                **Estimated Total Budget Breakdown:**
-                - Flight Cost: [Flight Price] INR
-                - Accommodation (2 Nights): [Total Hotel Price for 2 nights] INR
-                - Food & Local Travel Allowance: [Estimated Per-Day Local Expenses total] INR
+                Your 3-Day Trip to [Destination City Name] ([Planned Weekend Dates in 2026])
                 
-                **Total Cost:** [Complete calculated total mathematical sum] INR
+                Flight Selected:
+                - [Airline Name] (₹[Flight Price]) – Departs [Source City] at [Departure Time]
+                
+                Hotel Booked:
+                - [Hotel Name] (₹[Price per night]/night, [Star Rating]-star)
+                
+                Weather:
+                - Day 1: [Weather status forecast description] ([Max Temp]°C)
+                - Day 2: [Weather status forecast description] ([Max Temp]°C)
+                - Day 3: [Weather status forecast description] ([Max Temp]°C)
+                
+                Itinerary:
+                Day 1: [List top 2 sightseeing attractions from places.json separated by commas]
+                Day 2: [List next 2 sightseeing attractions from places.json separated by commas]
+                Day 3: [List final 2 sightseeing attractions from places.json separated by commas]
+                
+                Estimated Total Budget:
+                - Flight: ₹[Flight Price]
+                - Hotel: ₹[Total Calculated Hotel Price for 2 nights]
+                - Food & Travel: ₹[Estimated Local Expenses total]
+                -------------------------------------
+                Total Cost: ₹[Complete calculated total mathematical sum]
                 """
                 
                 final_response = self.client.models.generate_content(
@@ -141,7 +137,7 @@ class AutonomousAgentExecutor:
                     contents=final_prompt,
                     config=types.GenerateContentConfig(
                         system_instruction=system_instruction,
-                        temperature=0.2
+                        temperature=0.1
                     )
                 )
                 
